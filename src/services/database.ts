@@ -124,8 +124,8 @@ export async function createCollection(workspaceId: string, name: string): Promi
   await assertCollectionNameAvailable(d, workspaceId, name);
   const id = crypto.randomUUID();
   await d.execute(
-    "INSERT INTO collections (id, workspace_id, name) VALUES ($1, $2, $3)",
-    [id, workspaceId, name]
+    "INSERT INTO collections (id, workspace_id, name, auth_type) VALUES ($1, $2, $3, $4)",
+    [id, workspaceId, name, "none"]
   );
   return id;
 }

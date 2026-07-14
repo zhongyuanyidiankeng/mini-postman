@@ -1,5 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Tree, Button, Dropdown, Modal, Input, Empty, message } from "antd";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Tree,
+  Button,
+  Dropdown,
+  Modal,
+  Input,
+  Empty,
+  Tooltip,
+  message,
+} from "antd";
 import type { MenuProps } from "antd";
 import {
   PlusOutlined,
@@ -10,16 +19,26 @@ import {
   CloseOutlined,
   FolderAddOutlined,
   FileAddOutlined,
+  ImportOutlined,
+  ExportOutlined,
+  UploadOutlined,
+  SnippetsOutlined,
 } from "@ant-design/icons";
 import type { DataNode } from "antd/es/tree";
 import { useTranslation } from "react-i18next";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useTab } from "../../contexts/TabContext";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 import type { Collection, CollectionItem } from "../../types";
 import * as db from "../../services/database";
 import { normalizeAuthType, parseAuthConfig } from "../../services/auth";
 import { METHOD_COLORS } from "../../constants/http";
 import { parseKeyValueRows } from "../../utils/keyValue";
+import {
+  exportWorkspaceCollections,
+  importCollectionsFromText,
+} from "../../services/importExport";
 
 interface CollectionTreeProps {
   searchText: string;
@@ -28,6 +47,23 @@ interface CollectionTreeProps {
 type RenameTarget =
   | { type: "collection"; id: string; name: string }
   | { type: "item"; id: string; name: string };
+
+function exportFileName(workspaceName: string): string {
+  const slug = workspaceName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const date = new Date().toISOString().slice(0, 10);
+  return `mini-postman-${slug || "workspace"}-${date}.json`;
+}
+
+function isEditablePasteTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest("input, textarea, [contenteditable='true'], .monaco-editor")
+  );
+}
 
 export const CollectionTree: React.FC<CollectionTreeProps> = ({
   searchText,
@@ -44,6 +80,14 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
   const [newCollectionName, setNewCollectionName] = useState("");
   const [renaming, setRenaming] = useState<RenameTarget | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importContent, setImportContent] = useState("");
+  const [readingImportFile, setReadingImportFile] = useState(false);
+  const [readingClipboard, setReadingClipboard] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const importLockRef = useRef(false);
 
   const reload = useCallback(async () => {
     if (!activeWorkspace) {
@@ -71,6 +115,156 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
   useEffect(() => {
     reload();
   }, [reload]);
+
+  const handleExport = async () => {
+    if (!activeWorkspace || exporting) return;
+
+    setExporting(true);
+    try {
+      const fileName = exportFileName(activeWorkspace.name);
+      const filePath = await save({
+        title: t("collection.exportDialogTitle"),
+        defaultPath: fileName,
+        filters: [
+          {
+            name: t("collection.exportJsonFilter"),
+            extensions: ["json"],
+          },
+        ],
+      });
+      if (!filePath) return;
+
+      const data = await exportWorkspaceCollections(activeWorkspace.id);
+      await writeTextFile(filePath, JSON.stringify(data, null, 2));
+      message.success(
+        t("collection.exportSuccess", {
+          count: data.collections.length,
+          filePath,
+        })
+      );
+    } catch {
+      message.error(t("collection.exportFailed"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportFile = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file || readingImportFile) return;
+
+    setReadingImportFile(true);
+    try {
+      const content = await file.text();
+      if (!content.trim()) {
+        message.warning(t("collection.importEmpty"));
+        return;
+      }
+      setImportContent(content);
+    } catch {
+      message.error(t("collection.importFileFailed"));
+    } finally {
+      input.value = "";
+      setReadingImportFile(false);
+    }
+  };
+
+  const handleReadClipboard = async () => {
+    if (!activeWorkspace || importing || readingImportFile || readingClipboard) {
+      return;
+    }
+
+    setReadingClipboard(true);
+    try {
+      const content = await navigator.clipboard.readText();
+      if (!content.trim()) {
+        message.warning(t("collection.importClipboardEmpty"));
+        return;
+      }
+      setImportContent(content);
+    } catch {
+      message.error(t("collection.importClipboardFailed"));
+    } finally {
+      setReadingClipboard(false);
+    }
+  };
+
+  const closeImportModal = () => {
+    if (importing || readingImportFile || readingClipboard) return;
+    setShowImportModal(false);
+    setImportContent("");
+  };
+
+  const handleImport = async (
+    contentOverride?: string,
+    revealEditorOnError = false
+  ) => {
+    const content = contentOverride ?? importContent;
+    if (
+      !activeWorkspace ||
+      importLockRef.current ||
+      importing ||
+      readingImportFile ||
+      readingClipboard
+    ) {
+      return;
+    }
+    if (!content.trim()) {
+      message.warning(t("collection.importEmpty"));
+      return;
+    }
+
+    importLockRef.current = true;
+    setImporting(true);
+    try {
+      const result = await importCollectionsFromText(
+        activeWorkspace.id,
+        content
+      );
+      setExpandedKeys((keys) =>
+        Array.from(
+          new Set([
+            ...keys,
+            ...result.collectionIds.map((id) => `col-${id}`),
+          ])
+        )
+      );
+      await reload();
+      setShowImportModal(false);
+      setImportContent("");
+      if (result.firstRequestId) {
+        await handleOpenRequest(result.firstRequestId);
+      }
+      message.success(
+        t("collection.importSuccess", {
+          collectionCount: result.collectionCount,
+          requestCount: result.requestCount,
+        })
+      );
+    } catch (error) {
+      if (revealEditorOnError) {
+        setImportContent(content);
+        setShowImportModal(true);
+      }
+      const errorCode = error instanceof Error ? error.message : "";
+      if (errorCode === "UNSUPPORTED_IMPORT_FORMAT") {
+        message.error(t("collection.importUnsupported"));
+      } else if (
+        errorCode === "INVALID_YAML" ||
+        errorCode === "IMPORT_CONTENT_EMPTY"
+      ) {
+        message.error(t("collection.importInvalid"));
+      } else {
+        message.error(t("collection.importFailed"));
+      }
+    } finally {
+      importLockRef.current = false;
+      setImporting(false);
+    }
+  };
 
   useEffect(() => {
     const handleCollectionUpdate = (event: Event) => {
@@ -335,7 +529,7 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
     });
   };
 
-  const handleOpenRequest = async (itemId: string) => {
+  async function handleOpenRequest(itemId: string) {
     try {
       const item = await db.getCollectionItem(itemId);
       if (!item || item.type !== "request") return;
@@ -360,7 +554,7 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
     } catch {
       message.error(t("collection.openFailed"));
     }
-  };
+  }
 
   const renderNodeAction = (
     label: string,
@@ -446,7 +640,6 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
                 }
               }}
               onDoubleClick={(event) => {
-                if (item.type !== "request") return;
                 event.preventDefault();
                 event.stopPropagation();
                 startRename({ type: "item", id: item.id, name: item.name });
@@ -624,20 +817,68 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
     }));
 
   return (
-    <div className="collection-tree">
+    <div
+      className="collection-tree"
+      tabIndex={0}
+      aria-label={t("collection.pasteShortcutLabel")}
+      onPaste={(event) => {
+        if (
+          !activeWorkspace ||
+          importing ||
+          readingImportFile ||
+          readingClipboard ||
+          isEditablePasteTarget(event.target)
+        ) {
+          return;
+        }
+        const content = event.clipboardData.getData("text/plain");
+        if (!content.trim()) return;
+        event.preventDefault();
+        void handleImport(content, true);
+      }}
+    >
       <div className="collection-tree-header">
         <Button
           type="text"
           size="small"
           icon={<PlusOutlined />}
+          className="collection-tree-create"
           onClick={() => {
             setNewCollectionName(t("collection.untitled"));
             setShowCreateCollection(true);
           }}
-          disabled={showCreateCollection}
+          disabled={!activeWorkspace || showCreateCollection}
         >
           {t("collection.create")}
         </Button>
+        <span className="collection-tree-header-actions">
+          <Tooltip title={t("collection.import")}>
+            <Button
+              type="text"
+              size="small"
+              icon={<ImportOutlined />}
+              className="collection-tree-header-action"
+              aria-label={t("collection.import")}
+              loading={importing}
+              disabled={
+                !activeWorkspace || readingImportFile || readingClipboard
+              }
+              onClick={() => setShowImportModal(true)}
+            />
+          </Tooltip>
+          <Tooltip title={t("collection.export")}>
+            <Button
+              type="text"
+              size="small"
+              icon={<ExportOutlined />}
+              className="collection-tree-header-action"
+              aria-label={t("collection.export")}
+              loading={exporting}
+              disabled={!activeWorkspace || collections.length === 0}
+              onClick={() => void handleExport()}
+            />
+          </Tooltip>
+        </span>
       </div>
 
       {showCreateCollection && (
@@ -697,6 +938,83 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({
         />
       )}
 
+      <Modal
+        title={t("collection.importTitle")}
+        open={showImportModal}
+        okText={t("collection.importAndOpen")}
+        cancelText={t("common.cancel")}
+        confirmLoading={importing || readingImportFile || readingClipboard}
+        closable={!importing && !readingImportFile && !readingClipboard}
+        maskClosable={!importing && !readingImportFile && !readingClipboard}
+        keyboard={!importing && !readingImportFile && !readingClipboard}
+        width={720}
+        okButtonProps={{
+          disabled:
+            !activeWorkspace ||
+            !importContent.trim() ||
+            readingImportFile ||
+            readingClipboard,
+        }}
+        onOk={() => void handleImport()}
+        onCancel={closeImportModal}
+      >
+        <div className="collection-import-modal-content">
+          <div className="collection-import-source-row">
+            <label
+              className="collection-import-format"
+              htmlFor="collection-import-source"
+            >
+              {t("collection.importFormat")}
+            </label>
+            <span className="collection-import-source-actions">
+              <Button
+                size="small"
+                icon={<SnippetsOutlined />}
+                loading={readingClipboard}
+                disabled={importing || readingImportFile}
+                onClick={() => void handleReadClipboard()}
+              >
+                {t("collection.importFromClipboard")}
+              </Button>
+              <Button
+                size="small"
+                icon={<UploadOutlined />}
+                disabled={importing || readingImportFile || readingClipboard}
+                onClick={() => importFileInputRef.current?.click()}
+              >
+                {t("collection.importFromFile")}
+              </Button>
+            </span>
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml,text/x-yaml,text/plain"
+              className="collection-import-file-input"
+              onChange={(event) => void handleImportFile(event)}
+            />
+          </div>
+          <p className="collection-import-shortcut-hint">
+            {t("collection.importShortcutHint")}
+          </p>
+          <Input.TextArea
+            id="collection-import-source"
+            value={importContent}
+            placeholder={t("collection.importPlaceholder")}
+            rows={16}
+            readOnly={importing || readingImportFile || readingClipboard}
+            spellCheck={false}
+            autoFocus
+            className="collection-import-textarea"
+            onChange={(event) => setImportContent(event.target.value)}
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                event.preventDefault();
+                void handleImport();
+              }
+            }}
+          />
+        </div>
+      </Modal>
     </div>
   );
 };

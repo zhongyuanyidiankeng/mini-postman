@@ -5,6 +5,8 @@ export const HTTP_METHODS = [
   "PATCH",
   "DELETE",
   "HEAD",
+  "OPTIONS",
+  "TRACE",
 ] as const;
 
 export const METHOD_COLORS: Record<string, string> = {
@@ -14,4 +16,6 @@ export const METHOD_COLORS: Record<string, string> = {
   PATCH: "#9b59b6",
   DELETE: "#f93e3e",
   HEAD: "#9012fe",
+  OPTIONS: "#0f8b8d",
+  TRACE: "#8c6d1f",
 };

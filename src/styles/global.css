@@ -168,6 +168,33 @@ html, body, #root {
   margin-bottom: 12px;
 }
 
+.variable-scope-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--bg-tertiary);
+}
+
+.variable-scope-context-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.variable-scope-context-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .variable-scope-hint,
 .variable-scope-empty {
   color: var(--text-secondary);
@@ -239,8 +266,95 @@ html, body, #root {
 }
 
 /* ─── Collection Tree ─── */
+.collection-tree {
+  border-radius: var(--radius);
+  outline: none;
+}
+
+.collection-tree:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
 .collection-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 32px;
   padding: 4px 0;
+}
+
+.collection-tree-create {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.collection-tree-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.collection-tree-header-action {
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+}
+
+.collection-import-modal-content {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.collection-import-source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+}
+
+.collection-import-format {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.collection-import-source-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+  flex-shrink: 0;
+}
+
+.collection-import-source-row .ant-btn {
+  flex-shrink: 0;
+}
+
+.collection-import-shortcut-hint {
+  margin: -2px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.collection-import-file-input {
+  display: none;
+}
+
+.collection-import-textarea {
+  min-height: 320px !important;
+  max-height: min(52vh, 560px);
+  font-family: Consolas, "SFMono-Regular", "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  resize: vertical;
 }
 
 .collection-tree-view .ant-tree-treenode {

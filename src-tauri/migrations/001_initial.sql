@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS collections (
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   name         TEXT NOT NULL,
   description  TEXT DEFAULT '',
-  auth_type    TEXT DEFAULT 'none',
+  auth_type    TEXT DEFAULT 'noauth',
   auth_config  TEXT DEFAULT '{}',
   sort_order   INTEGER DEFAULT 0,
   created_at   TEXT NOT NULL DEFAULT (datetime('now')),

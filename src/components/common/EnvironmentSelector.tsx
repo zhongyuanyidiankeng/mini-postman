@@ -44,14 +44,66 @@ export const EnvironmentSelector: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [newEnvironmentName, setNewEnvironmentName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [activeCollectionName, setActiveCollectionName] =
+    useState<string | null>(null);
+  const [collectionContextLoading, setCollectionContextLoading] =
+    useState(false);
   const noEnvironmentLabel = t("environment.noEnv");
+  const activeCollectionId = activeTab?.collectionId || null;
+  const activeEnvironmentName =
+    environments.find((environment) => environment.id === activeEnvId)?.name ||
+    noEnvironmentLabel;
 
   const ownerId =
     scope === "environment"
       ? activeEnvId
       : scope === "collection"
-        ? activeTab?.collectionId || null
+        ? activeCollectionId
         : activeWorkspace?.id || null;
+
+  useEffect(() => {
+    if (!managerOpen || scope !== "collection" || !activeCollectionId) {
+      setActiveCollectionName(null);
+      setCollectionContextLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCollectionContextLoading(true);
+    void db
+      .getCollection(activeCollectionId)
+      .then((collection) => {
+        if (cancelled) return;
+        if (
+          collection &&
+          activeWorkspace &&
+          collection.workspace_id === activeWorkspace.id
+        ) {
+          setActiveCollectionName(collection.name);
+        } else {
+          setActiveCollectionName(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setActiveCollectionName(null);
+          message.error(t("environment.collectionContextLoadFailed"));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCollectionContextLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeCollectionId,
+    activeWorkspace?.id,
+    managerOpen,
+    scope,
+    t,
+  ]);
 
   useEffect(() => {
     if (!managerOpen || !ownerId) {
@@ -195,7 +247,7 @@ export const EnvironmentSelector: React.FC = () => {
   const handleDeleteEnvironment = () => {
     if (!activeEnvId) return;
     Modal.confirm({
-      title: t("environment.deleteConfirm"),
+      title: t("environment.deleteConfirm", { name: activeEnvironmentName }),
       okText: t("common.delete"),
       cancelText: t("common.cancel"),
       okButtonProps: { danger: true },
@@ -210,8 +262,23 @@ export const EnvironmentSelector: React.FC = () => {
     });
   };
 
-  const scopeContent = (hint: string) => (
+  const scopeContent = (
+    hint: string,
+    contextLabel: string,
+    contextName: string,
+    contextLoading = false
+  ) => (
     <div className="variable-scope-editor">
+      <div className="variable-scope-context" aria-live="polite">
+        <span className="variable-scope-context-label">{contextLabel}</span>
+        {contextLoading ? (
+          <Spin size="small" />
+        ) : (
+          <strong className="variable-scope-context-name" title={contextName}>
+            {contextName}
+          </strong>
+        )}
+      </div>
       <p className="variable-scope-hint">{hint}</p>
       {loading ? (
         <div className="variable-scope-loading">
@@ -238,7 +305,10 @@ export const EnvironmentSelector: React.FC = () => {
           size="small"
           className="environment-select"
           suffixIcon={<GlobalOutlined />}
-          title={noEnvironmentLabel}
+          title={activeEnvironmentName}
+          aria-label={`${t(
+            "environment.currentEnvironment"
+          )}: ${activeEnvironmentName}`}
           notFoundContent={noEnvironmentLabel}
           options={environments.map((env) => ({
             value: env.id,
@@ -284,6 +354,7 @@ export const EnvironmentSelector: React.FC = () => {
                       }
                       onPressEnter={() => void handleCreateEnvironment()}
                       placeholder={t("environment.newName")}
+                      aria-label={t("environment.newName")}
                     />
                     <Button
                       size="small"
@@ -295,18 +366,23 @@ export const EnvironmentSelector: React.FC = () => {
                       {t("environment.create")}
                     </Button>
                     <Button
-                      type="text"
                       size="small"
                       danger
                       icon={<DeleteOutlined />}
                       disabled={!activeEnvId}
+                      title={t("environment.deleteSelected")}
+                      aria-label={t("environment.deleteSelected")}
                       onClick={handleDeleteEnvironment}
-                    />
+                    >
+                      {t("environment.deleteSelected")}
+                    </Button>
                   </div>
                   {scopeContent(
                     activeEnvId
                       ? t("environment.environmentScopeHint")
-                      : t("environment.selectOrCreate")
+                      : t("environment.selectOrCreate"),
+                    t("environment.currentEnvironment"),
+                    activeEnvironmentName
                   )}
                 </>
               ),
@@ -315,17 +391,22 @@ export const EnvironmentSelector: React.FC = () => {
               key: "collection",
               label: t("environment.collectionScope"),
               children: scopeContent(
-                activeTab?.collectionId
-                  ? t("environment.collectionScopeHint", {
-                      name: activeTab.title,
-                    })
-                  : t("environment.collectionScopeMissing")
+                activeCollectionId
+                  ? t("environment.collectionScopeHint")
+                  : t("environment.collectionScopeMissing"),
+                t("environment.currentCollection"),
+                activeCollectionName || t("environment.noCollection"),
+                collectionContextLoading
               ),
             },
             {
               key: "global",
               label: t("environment.globalScope"),
-              children: scopeContent(t("environment.globalScopeHint")),
+              children: scopeContent(
+                t("environment.globalScopeHint"),
+                t("environment.currentWorkspace"),
+                activeWorkspace?.name || t("environment.noWorkspace")
+              ),
             },
           ]}
         />
