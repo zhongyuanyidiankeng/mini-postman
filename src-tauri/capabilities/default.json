@@ -1,0 +1,10 @@
+{
+  "identifier": "default",
+  "description": "Default capability for Mini Postman",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "sql:default",
+    "sql:allow-execute"
+  ]
+}

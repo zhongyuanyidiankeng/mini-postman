@@ -1,0 +1,95 @@
+:root {
+  color-scheme: dark;
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #1a1a2e;
+  --bg-tertiary: #16213e;
+  --bg-elevated: #1e1e3a;
+  --border-color: #2a2a4a;
+  --text-primary: #e4e4f0;
+  --text-secondary: #8888aa;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --success: #49cc90;
+  --warning: #fca130;
+  --error: #f93e3e;
+  --info: #50b5ff;
+  --sider-width: 280px;
+  --tab-height: 36px;
+  --status-bar-height: 24px;
+  --radius: 6px;
+  --transition: 0.15s ease;
+}
+
+:root[data-bg-theme="graphite"] {
+  --bg-primary: #111315;
+  --bg-secondary: #181b1f;
+  --bg-tertiary: #20252b;
+  --bg-elevated: #242930;
+  --border-color: #323942;
+  --text-primary: #eef1f4;
+  --text-secondary: #98a2ad;
+  --accent: #5b8def;
+  --accent-hover: #7da6f5;
+}
+
+:root[data-bg-theme="forest"] {
+  --bg-primary: #071713;
+  --bg-secondary: #0d211c;
+  --bg-tertiary: #123028;
+  --bg-elevated: #16382f;
+  --border-color: #245247;
+  --text-primary: #e5f2ee;
+  --text-secondary: #8eb5a9;
+  --accent: #3fb98b;
+  --accent-hover: #65caa4;
+}
+
+:root[data-bg-theme="warm"] {
+  --bg-primary: #181512;
+  --bg-secondary: #211d18;
+  --bg-tertiary: #2b251d;
+  --bg-elevated: #342c22;
+  --border-color: #4a3d2d;
+  --text-primary: #f2ece3;
+  --text-secondary: #b5a793;
+  --accent: #d58b4b;
+  --accent-hover: #e2a26c;
+}
+
+:root[data-bg-theme="ocean"] {
+  --bg-primary: #081923;
+  --bg-secondary: #0d2531;
+  --bg-tertiary: #10303e;
+  --bg-elevated: #153847;
+  --border-color: #245064;
+  --text-primary: #e6f3f7;
+  --text-secondary: #8cb3c2;
+  --accent: #2ea9c7;
+  --accent-hover: #55bdd5;
+}
+
+:root[data-bg-theme="white"] {
+  color-scheme: light;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f7f9;
+  --bg-tertiary: #eef1f4;
+  --bg-elevated: #ffffff;
+  --border-color: #d9dde3;
+  --text-primary: #20242a;
+  --text-secondary: #667085;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+}
+
+:root[data-bg-theme="mist"] {
+  color-scheme: light;
+  --bg-primary: #eef1f5;
+  --bg-secondary: #e4e8ed;
+  --bg-tertiary: #dbe1e7;
+  --bg-elevated: #f8fafc;
+  --border-color: #cbd2da;
+  --text-primary: #252a31;
+  --text-secondary: #65717e;
+  --accent: #0f766e;
+  --accent-hover: #0d9488;
+}
